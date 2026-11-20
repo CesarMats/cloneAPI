@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f0f0f" />
+    <meta name="description" content="Vidrio, comparte y descubre videos." />
+    <title>Vidrio — videos para descubrir</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Vidrio inicio"><span class="brand-mark">▶</span><span>vidrio</span></a>
+        <form class="search" id="search-form" role="search">
+          <input id="search-input" type="search" placeholder="Buscar videos" aria-label="Buscar videos" />
+          <button aria-label="Buscar" type="submit">⌕</button>
+        </form>
+        <div class="top-actions">
+          <button class="button button-quiet" id="upload-open" type="button">＋ <span>Subir</span></button>
+          <button class="button button-primary" id="auth-open" type="button">Iniciar sesión</button>
+          <div class="account hidden" id="account-menu">
+            <span class="avatar" id="account-avatar">V</span>
+            <span class="account-email" id="account-email"></span>
+            <button class="text-button" id="logout-button" type="button">Salir</button>
+          </div>
+        </div>
+      </header>
+
+      <div class="layout">
+        <aside class="sidebar">
+          <button class="nav-link active" type="button" data-filter="all"><span>⌂</span> Inicio</button>
+          <button class="nav-link" type="button" data-filter="recent"><span>◷</span> Recientes</button>
+          <div class="sidebar-rule"></div>
+          <p class="sidebar-label">TU ESPACIO</p>
+          <button class="nav-link" id="channel-open" type="button"><span>＋</span> Crear un canal</button>
+          <div class="sidebar-note">Un buen video puede llevarte a cualquier lugar.</div>
+          <div class="sidebar-bottom">HECHO PARA DESCUBRIR <span>✳</span></div>
+        </aside>
+
+        <main class="content">
+          <section class="welcome">
+            <div>
+              <p class="eyebrow"><span class="live-dot"></span> TU PRÓXIMO VIDEO FAVORITO</p>
+              <h1>Ideas que<br /><span>merecen verse.</span></h1>
+              <p class="welcome-copy">Un espacio para descubrir historias, aprender algo nuevo y compartir lo que te mueve.</p>
+              <button class="button button-primary welcome-cta" id="welcome-upload" type="button">Comparte tu primer video <span>↗</span></button>
+            </div>
+            <div class="hero-art" aria-hidden="true">
+              <div class="hero-orbit orbit-one"></div><div class="hero-orbit orbit-two"></div>
+              <div class="hero-play">▶</div><div class="hero-chip chip-one">play<br />something new</div>
+              <div class="hero-chip chip-two">✳ &nbsp; good things<br />are in motion</div>
+              <div class="hero-spark">✳</div>
+            </div>
+            <span class="hero-index">V / 001</span>
+          </section>
+
+          <section class="video-section">
+            <div class="section-heading">
+              <div><p class="eyebrow">LA COMUNIDAD</p><h2 id="feed-title">Videos para ti <span>✳</span></h2></div>
+              <span class="result-count" id="result-count"></span>
+            </div>
+            <div class="notice hidden" id="setup-notice"></div>
+            <div class="video-grid" id="video-grid"></div>
+            <div class="empty-state hidden" id="empty-state">
+              <span class="empty-icon">◌</span><h3 id="empty-title">El siguiente video podría ser tuyo.</h3>
+              <p id="empty-copy">Inicia sesión y comparte algo con la comunidad.</p>
+              <button class="button button-primary" id="empty-action" type="button">Comenzar</button>
+            </div>
+          </section>
+          <footer class="footer"><span>vidrio <span class="footer-dot">✳</span> Un lugar para las buenas ideas.</span><span>HECHO PARA DESCUBRIR · 2026</span></footer>
+        </main>
+      </div>
+
+      <dialog class="modal" id="auth-modal">
+        <form class="modal-card" id="auth-form">
+          <button class="modal-close" type="button" data-close aria-label="Cerrar">×</button>
+          <p class="eyebrow">BIENVENIDO A VIDRIO</p><h2 id="auth-title">Qué bueno verte.</h2>
+          <p class="modal-copy" id="auth-copy">Inicia sesión para compartir y descubrir.</p>
+          <label>Correo electrónico<input name="email" type="email" autocomplete="email" required placeholder="tu@correo.com" /></label>
+          <label>Contraseña<input name="password" type="password" autocomplete="current-password" minlength="6" required placeholder="Mínimo 6 caracteres" /></label>
+          <button class="button button-primary button-wide" id="auth-submit" type="submit">Iniciar sesión</button>
+          <p class="form-message" id="auth-message" aria-live="polite"></p>
+          <button class="switch-button" id="auth-switch" type="button">¿No tienes cuenta? <strong>Regístrate</strong></button>
+        </form>
+      </dialog>
+
+      <dialog class="modal" id="channel-modal">
+        <form class="modal-card" id="channel-form">
+          <button class="modal-close" type="button" data-close aria-label="Cerrar">×</button>
+          <p class="eyebrow">TU PROPIO ESPACIO</p><h2>Crea tu canal.</h2>
+          <p class="modal-copy">Elige un nombre para tu espacio en Vidrio.</p>
+          <label>Nombre del canal<input name="name" maxlength="60" required placeholder="Ej. Ideas en movimiento" /></label>
+          <label>Usuario del canal<input name="handle" maxlength="30" pattern="[A-Za-z0-9_]+" required placeholder="ideas_en_movimiento" /></label>
+          <label>Descripción<textarea name="description" maxlength="500" rows="3" placeholder="¿De qué trata tu canal?"></textarea></label>
+          <button class="button button-primary button-wide" type="submit">Crear canal</button>
+          <p class="form-message" id="channel-message" aria-live="polite"></p>
+        </form>
+      </dialog>
+
+      <dialog class="modal" id="upload-modal">
+        <form class="modal-card" id="upload-form">
+          <button class="modal-close" type="button" data-close aria-label="Cerrar">×</button>
+          <p class="eyebrow">DALE PLAY A TU IDEA</p><h2>Sube un video.</h2>
+          <p class="modal-copy">El archivo se envía directamente a Cloudinary.</p>
+          <label>Título<input name="title" maxlength="120" required placeholder="Ponle nombre a tu historia" /></label>
+          <label>Descripción<textarea name="description" maxlength="5000" rows="3" placeholder="Cuéntanos un poco más"></textarea></label>
+          <label>Archivo de video<input name="video" type="file" accept="video/mp4,video/webm,video/quicktime" required /></label>
+          <p class="upload-hint">MP4, WebM o MOV · máximo 100 MB</p>
+          <button class="button button-primary button-wide" type="submit">Subir video <span>↗</span></button>
+          <p class="form-message" id="upload-message" aria-live="polite"></p>
+        </form>
+      </dialog>
+
+      <dialog class="modal player-modal" id="player-modal">
+        <div class="player-card">
+          <button class="modal-close" type="button" data-close aria-label="Cerrar">×</button>
+          <video id="player-video" controls playsinline></video>
+          <div class="player-details"><div class="player-title-row"><div><p class="eyebrow" id="player-channel"></p><h2 id="player-title"></h2></div><button class="like-button" id="player-like" type="button">♡ <span id="player-like-count">0</span></button></div>
+            <p class="player-description" id="player-description"></p>
+            <section class="comments"><h3>Conversación <span id="comment-count"></span></h3>
+              <form id="comment-form"><input name="content" maxlength="1000" required placeholder="Escribe un comentario…" /><button class="button button-primary" type="submit">Enviar</button></form>
+              <p class="form-message" id="comment-message" aria-live="polite"></p><div id="comment-list"></div>
+            </section>
+          </div>
+        </div>
+      </dialog>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
