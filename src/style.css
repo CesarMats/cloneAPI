@@ -15,7 +15,7 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 360px; min-height: 100vh; background: var(--bg); }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--bg); }
 button, input, textarea { font: inherit; }
 button { color: inherit; }
 .hidden { display: none !important; }
@@ -32,6 +32,7 @@ button { color: inherit; }
 .button:disabled { opacity: .6; cursor: wait; transform: none; }
 .button-primary { color: #161710; background: var(--lime); }
 .button-primary:hover { background: #e2ff88; }
+.auth-short-label { display: none; }
 .button-quiet { color: var(--text); background: transparent; border-color: #3a3a37; }
 .button-wide { width: 100%; margin-top: 8px; }
 .account { display: flex; align-items: center; gap: 9px; font-size: 12px; }
@@ -192,4 +193,8 @@ button { color: inherit; }
   .video-avatar { width: 31px; height: 31px; }
   .welcome { min-height: 290px; }
   .footer { flex-direction: column; }
+}
+@media (max-width: 380px) {
+  .auth-full-label { display: none; }
+  .auth-short-label { display: inline; }
 }
