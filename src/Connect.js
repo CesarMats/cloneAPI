@@ -8,6 +8,8 @@ export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
+const PAGE_SIZE = 24;
+
 function requireSupabase() {
   if (!supabase) {
     throw new Error("Configura VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en .env.");
@@ -15,16 +17,20 @@ function requireSupabase() {
   return supabase;
 }
 
-export async function obtenerVideos() {
-  const { data, error } = await requireSupabase()
+export async function obtenerVideos(from = 0, searchTerm = "") {
+  let query = requireSupabase()
     .from("videos")
-    .select("id, titulo, descripcion, video_url, thumbnail_url, created_at, canal_id, channels(id, name, handle)")
+    .select("id, titulo, descripcion, video_url, thumbnail_url, created_at, canal_id, channels(id, name, handle)", { count: "exact" })
     .order("created_at", { ascending: false });
+  const phrase = searchTerm.trim().replace(/[^\p{L}\p{N}\s_-]/gu, " ").replace(/\s+/g, " ").trim();
+  if (phrase) query = query.or(`titulo.ilike.%${phrase}%,descripcion.ilike.%${phrase}%`);
+  const { data, error, count } = await query
+    .range(from, from + PAGE_SIZE - 1);
 
   if (error) throw error;
 
   const videos = data ?? [];
-  if (videos.length === 0) return [];
+  if (videos.length === 0) return { videos: [], total: count ?? 0 };
 
   const { data: likes, error: likesError } = await requireSupabase()
     .from("likes")
@@ -32,22 +38,25 @@ export async function obtenerVideos() {
     .in("video_id", videos.map((video) => video.id));
   if (likesError) throw likesError;
 
-  const { data: { user }, error: userError } = await requireSupabase().auth.getUser();
-  if (userError) throw userError;
+  const { data: { session }, error: sessionError } = await requireSupabase().auth.getSession();
+  if (sessionError) throw sessionError;
   const likesByVideo = new Map();
   for (const like of likes ?? []) {
     const current = likesByVideo.get(like.video_id) ?? { count: 0, liked: false };
     current.count += 1;
-    current.liked ||= like.user_id === user?.id;
+    current.liked ||= like.user_id === session?.user.id;
     likesByVideo.set(like.video_id, current);
   }
 
-  return videos.map((video) => ({
-    ...video,
-    channel: video.channels,
-    likeCount: likesByVideo.get(video.id)?.count ?? 0,
-    liked: likesByVideo.get(video.id)?.liked ?? false,
-  }));
+  return {
+    videos: videos.map((video) => ({
+      ...video,
+      channel: video.channels,
+      likeCount: likesByVideo.get(video.id)?.count ?? 0,
+      liked: likesByVideo.get(video.id)?.liked ?? false,
+    })),
+    total: count ?? videos.length,
+  };
 }
 
 export async function crearCanal({ name, handle, description }) {

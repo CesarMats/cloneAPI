@@ -9,7 +9,7 @@ export async function subirVideo(archivoVideo, titulo, descripcion, canalId) {
   if (!CLOUD_NAME || !UPLOAD_PRESET) {
     throw new Error("Configura VITE_CLOUDINARY_CLOUD_NAME y VITE_CLOUDINARY_UPLOAD_PRESET en .env.");
   }
-  if (!archivoVideo || !ALLOWED_TYPES.has(archivoVideo.type)) {
+  if (!archivoVideo || archivoVideo.size === 0 || !ALLOWED_TYPES.has(archivoVideo.type)) {
     throw new Error("Selecciona un archivo MP4, WebM o MOV.");
   }
   if (archivoVideo.size > MAX_FILE_SIZE) {
@@ -26,20 +26,32 @@ export async function subirVideo(archivoVideo, titulo, descripcion, canalId) {
     `https://api.cloudinary.com/v1_1/${encodeURIComponent(CLOUD_NAME)}/video/upload`,
     { method: "POST", body: formData },
   );
-  const result = await response.json();
+  const result = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(result.error?.message ?? "Cloudinary no pudo subir el video.");
+    throw new Error(result?.error?.message ?? "Cloudinary no pudo subir el video.");
   }
-  if (!result.secure_url || !result.public_id) {
+  if (!result?.secure_url || !result.public_id) {
     throw new Error("Cloudinary respondió sin la URL segura del video.");
   }
 
-  return guardarVideo({
-    titulo: titulo.trim(),
-    descripcion: descripcion.trim(),
-    videoUrl: result.secure_url,
-    thumbnailUrl: result.thumbnail_url ?? null,
-    publicId: result.public_id,
-    canalId,
-  });
+  const thumbnailUrl = result.thumbnail_url
+    ?? result.eager?.[0]?.secure_url
+    ?? result.secure_url
+      .replace("/video/upload/", "/video/upload/so_0,w_640,h_360,c_fill,q_auto,f_jpg/")
+      .replace(/\.(mp4|webm|mov)$/i, ".jpg");
+
+  try {
+    return await guardarVideo({
+      titulo: titulo.trim(),
+      descripcion: descripcion.trim(),
+      videoUrl: result.secure_url,
+      thumbnailUrl,
+      publicId: result.public_id,
+      canalId,
+    });
+  } catch (error) {
+    const saveError = new Error(error.message || "No se pudieron guardar los datos del video.");
+    saveError.cloudinaryUploaded = true;
+    throw saveError;
+  }
 }

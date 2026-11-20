@@ -24,6 +24,11 @@ let searchTerm = "";
 let activeFilter = "all";
 let authMode = "login";
 let toastTimer;
+let totalVideos = 0;
+let videoOffset = 0;
+let feedError = "";
+let loadingVideos = false;
+let videoRequest = 0;
 
 function showToast(message) {
   toast.textContent = message;
@@ -39,6 +44,7 @@ function setMessage(element, message, isError = false) {
 
 function formatDate(value) {
   const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
   const elapsed = Math.max(0, Date.now() - date.getTime());
   const days = Math.floor(elapsed / 86400000);
   if (days < 1) return "hoy";
@@ -84,13 +90,23 @@ function createVideoCard(video) {
   like.setAttribute("aria-label", "Dar like");
   like.addEventListener("click", async () => {
     if (!supabase) return showToast("Conecta Supabase para dar like.");
+    if (like.disabled) return;
+    like.disabled = true;
     try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!session) {
+        openAuth();
+        return showToast("Inicia sesión para dar like.");
+      }
       await alternarLike(video.id, video.liked);
       video.liked = !video.liked;
       video.likeCount += video.liked ? 1 : -1;
       renderVideos();
     } catch (error) {
       showToast(error.message || "No se pudo actualizar el like.");
+    } finally {
+      like.disabled = false;
     }
   });
   info.append(channelIcon, copy, like);
@@ -110,41 +126,79 @@ function renderVideos() {
   const empty = $("#empty-state");
   if (filtered.length === 0) {
     empty.classList.remove("hidden");
-    $("#empty-title").textContent = searchTerm
-      ? "No encontramos ese video."
-      : isSupabaseConfigured ? "El siguiente video podría ser tuyo." : "Tu comunidad empieza aquí.";
-    $("#empty-copy").textContent = searchTerm
-      ? "Prueba con otras palabras o explora más tarde."
-      : isSupabaseConfigured ? "Inicia sesión y comparte algo con la comunidad." : "Configura Supabase y Cloudinary para publicar y descubrir videos.";
-    $("#empty-action").textContent = searchTerm ? "Limpiar búsqueda" : isSupabaseConfigured ? "Comenzar" : "Ver configuración";
+    if (feedError) {
+      $("#empty-title").textContent = "No pudimos cargar los videos.";
+      $("#empty-copy").textContent = feedError;
+      $("#empty-action").textContent = "Reintentar";
+    } else {
+      $("#empty-title").textContent = searchTerm
+        ? "No encontramos ese video."
+        : isSupabaseConfigured ? "El siguiente video podría ser tuyo." : "Tu comunidad empieza aquí.";
+      $("#empty-copy").textContent = searchTerm
+        ? "Prueba con otras palabras o explora más tarde."
+        : isSupabaseConfigured ? "Inicia sesión y comparte algo con la comunidad." : "Configura Supabase y Cloudinary para publicar y descubrir videos.";
+      $("#empty-action").textContent = searchTerm ? "Limpiar búsqueda" : isSupabaseConfigured ? "Comenzar" : "Ver configuración";
+    }
     grid.classList.add("hidden");
-    return;
+  } else {
+    empty.classList.add("hidden");
+    grid.classList.remove("hidden");
+    filtered.forEach((video) => grid.append(createVideoCard(video)));
   }
-  empty.classList.add("hidden");
-  grid.classList.remove("hidden");
-  filtered.forEach((video) => grid.append(createVideoCard(video)));
+  $("#feed-actions").classList.toggle("hidden", videoOffset >= totalVideos || totalVideos === 0);
 }
 
-async function loadVideos() {
+function reloadVideos() {
+  videos = [];
+  videoOffset = 0;
+  totalVideos = 0;
+  feedError = "";
+  return loadVideos();
+}
+
+async function loadVideos({ append = false } = {}) {
+  if (loadingVideos && append) return;
   if (!isSupabaseConfigured) {
     $("#setup-notice").textContent = "Para conectar tu comunidad, configura Supabase y Cloudinary en el archivo .env (consulta README.md).";
     $("#setup-notice").classList.remove("hidden");
-    $("#empty-title").textContent = "Tu comunidad empieza aquí.";
-    $("#empty-copy").textContent = "Configura Supabase y Cloudinary para publicar y descubrir videos.";
-    $("#empty-action").textContent = "Ver configuración";
-    $("#empty-action").onclick = () => showToast("Sigue los pasos de configuración en README.md.");
+    feedError = "";
+    $("#loading-state").classList.add("hidden");
     renderVideos();
     return;
   }
+  loadingVideos = true;
+  const request = ++videoRequest;
+  if (!append) {
+    $("#loading-state").classList.remove("hidden");
+    $("#empty-state").classList.add("hidden");
+    grid.replaceChildren();
+    $("#feed-actions").classList.add("hidden");
+  } else {
+    $("#load-more").disabled = true;
+    $("#load-more").textContent = "Cargando…";
+  }
   try {
-    videos = await obtenerVideos();
+    const result = await obtenerVideos(append ? videoOffset : 0, searchTerm);
+    if (request !== videoRequest) return;
+    videos = append ? [...videos, ...result.videos] : result.videos;
+    totalVideos = result.total;
+    videoOffset = videos.length;
+    feedError = "";
+    $("#setup-notice").classList.add("hidden");
     renderVideos();
   } catch (error) {
-    $("#setup-notice").textContent = `No se pudieron cargar los videos: ${error.message}`;
-    $("#setup-notice").classList.remove("hidden");
-    $("#empty-title").textContent = "No pudimos conectar con Supabase.";
-    $("#empty-copy").textContent = "Verifica la configuración y las tablas para volver a cargar el contenido.";
-    renderVideos();
+    if (request !== videoRequest) return;
+    feedError = error.message || "Revisa tu conexión a Supabase e inténtalo de nuevo.";
+    if (append) showToast(`No se pudieron cargar más videos: ${feedError}`);
+    else renderVideos();
+  } finally {
+    if (request === videoRequest) {
+      loadingVideos = false;
+      $("#loading-state").classList.add("hidden");
+      $("#load-more").disabled = false;
+      $("#load-more").textContent = "Cargar más videos";
+      renderVideos();
+    }
   }
 }
 
@@ -162,7 +216,8 @@ function openAuth() {
 
 function openVideo(video) {
   currentVideo = video;
-  $("#player-video").src = video.video_url;
+  const player = $("#player-video");
+  player.src = video.video_url;
   $("#player-title").textContent = video.titulo;
   $("#player-channel").textContent = video.channel?.name ?? "CANAL";
   $("#player-description").textContent = video.descripcion || "Sin descripción.";
@@ -170,6 +225,7 @@ function openVideo(video) {
   $("#comment-list").replaceChildren();
   $("#comment-message").textContent = "";
   playerModal.showModal();
+  player.play().catch(() => showToast("Presiona reproducir para iniciar el video."));
   loadComments(video.id);
 }
 
@@ -211,13 +267,13 @@ $("#search-form").addEventListener("submit", (event) => {
   event.preventDefault();
   searchTerm = $("#search-input").value.trim();
   $("#feed-title").firstChild.textContent = searchTerm ? "Resultados de búsqueda " : "Videos para ti ";
-  renderVideos();
+  reloadVideos();
 });
 $("#search-input").addEventListener("input", (event) => {
-  searchTerm = event.target.value.trim();
-  if (!searchTerm) {
+  if (!event.target.value.trim() && searchTerm) {
+    searchTerm = "";
     $("#feed-title").firstChild.textContent = "Videos para ti ";
-    renderVideos();
+    reloadVideos();
   }
 });
 document.querySelectorAll(".nav-link[data-filter]").forEach((button) => {
@@ -242,10 +298,12 @@ async function beginUpload() {
 }
 $("#upload-open").addEventListener("click", beginUpload);
 $("#welcome-upload").addEventListener("click", beginUpload);
+$("#load-more").addEventListener("click", () => loadVideos({ append: true }));
 $("#channel-open").addEventListener("click", async () => {
   if (!supabase) return showToast("Configura Supabase para crear tu canal.");
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) throw error;
     if (!session) return openAuth();
     channel = await obtenerCanalUsuario();
     if (channel) return showToast(`Tu canal @${channel.handle} ya está listo.`);
@@ -256,28 +314,31 @@ $("#channel-open").addEventListener("click", async () => {
   }
 });
 $("#empty-action").addEventListener("click", () => {
-  if (searchTerm) {
+  if (feedError) {
+    reloadVideos();
+  } else if (searchTerm) {
     searchTerm = "";
     $("#search-input").value = "";
-    renderVideos();
+    $("#feed-title").firstChild.textContent = "Videos para ti ";
+    reloadVideos();
   } else if (isSupabaseConfigured) beginUpload();
   else showToast("Sigue los pasos de configuración en README.md.");
 });
 
-function openUpload() {
-  if (!channel) {
-    obtenerCanalUsuario().then((userChannel) => {
-      channel = userChannel;
-      if (channel) uploadModal.showModal();
-      else {
-        setMessage($("#channel-message"), "");
-        channelModal.showModal();
-        showToast("Primero crea tu canal para publicar.");
-      }
-    }).catch((error) => showToast(error.message || "No se pudo revisar tu canal."));
-    return;
+async function openUpload() {
+  try {
+    if (!channel) channel = await obtenerCanalUsuario();
+    if (channel) {
+      setMessage($("#upload-message"), "");
+      uploadModal.showModal();
+      return;
+    }
+    setMessage($("#channel-message"), "");
+    channelModal.showModal();
+    showToast("Primero crea tu canal para publicar.");
+  } catch (error) {
+    showToast(error.message || "No se pudo revisar tu canal.");
   }
-  uploadModal.showModal();
 }
 
 $("#auth-switch").addEventListener("click", () => {
@@ -321,10 +382,14 @@ $("#auth-form").addEventListener("submit", async (event) => {
 });
 
 $("#logout-button").addEventListener("click", async () => {
-  const { error } = await supabase.auth.signOut();
-  if (error) return showToast(error.message);
-  channel = null;
-  showToast("Sesión cerrada.");
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    channel = null;
+    showToast("Sesión cerrada.");
+  } catch (error) {
+    showToast(error.message || "No se pudo cerrar la sesión.");
+  }
 });
 
 $("#channel-form").addEventListener("submit", async (event) => {
@@ -359,14 +424,22 @@ $("#upload-form").addEventListener("submit", async (event) => {
   button.disabled = true;
   setMessage($("#upload-message"), "Preparando la subida…");
   try {
+    if (!file || file.size === 0) throw new Error("Selecciona un archivo de video válido.");
     if (!channel) channel = await obtenerCanalUsuario();
     if (!channel) throw new Error("Primero crea tu canal.");
     setMessage($("#upload-message"), "Subiendo video directamente a Cloudinary…");
-    await subirVideo(file, values.get("title"), values.get("description"), channel.id);
+    try {
+      await subirVideo(file, values.get("title"), values.get("description"), channel.id);
+    } catch (error) {
+      if (error.cloudinaryUploaded) {
+        throw new Error(`El video llegó a Cloudinary, pero no se pudo registrar en Supabase: ${error.message}`);
+      }
+      throw error;
+    }
     uploadModal.close();
     formElement.reset();
     showToast("¡Video publicado con éxito!");
-    await loadVideos();
+    await reloadVideos();
   } catch (error) {
     setMessage($("#upload-message"), error.message || "No se pudo subir el video.", true);
   } finally {
@@ -376,7 +449,16 @@ $("#upload-form").addEventListener("submit", async (event) => {
 
 $("#player-like").addEventListener("click", async () => {
   if (!currentVideo || !supabase) return showToast("Conecta Supabase para dar like.");
+  const button = $("#player-like");
+  if (button.disabled) return;
+  button.disabled = true;
   try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (!session) {
+      openAuth();
+      return showToast("Inicia sesión para dar like.");
+    }
     await alternarLike(currentVideo.id, currentVideo.liked);
     currentVideo.liked = !currentVideo.liked;
     currentVideo.likeCount += currentVideo.liked ? 1 : -1;
@@ -384,20 +466,34 @@ $("#player-like").addEventListener("click", async () => {
     renderVideos();
   } catch (error) {
     showToast(error.message || "No se pudo actualizar el like.");
+  } finally {
+    button.disabled = false;
   }
 });
 
 $("#comment-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!currentVideo || !supabase) return showToast("Conecta Supabase para comentar.");
-  const input = event.currentTarget.elements.content;
+  const formElement = event.currentTarget;
+  const input = formElement.elements.content;
+  const button = formElement.querySelector('button[type="submit"]');
+  if (button.disabled) return;
+  button.disabled = true;
   try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (!session) {
+      openAuth();
+      return showToast("Inicia sesión para comentar.");
+    }
     await crearComentario(currentVideo.id, input.value.trim());
     input.value = "";
     setMessage($("#comment-message"), "");
     await loadComments(currentVideo.id);
   } catch (error) {
     setMessage($("#comment-message"), error.message || "No se pudo publicar el comentario.", true);
+  } finally {
+    button.disabled = false;
   }
 });
 
@@ -414,11 +510,19 @@ playerModal.addEventListener("close", () => {
   $("#player-video").removeAttribute("src");
 });
 
+let activeUserId;
 if (supabase) {
-  supabase.auth.onAuthStateChange((_event, session) => {
+  supabase.auth.onAuthStateChange((event, session) => {
     updateAuthUI(session?.user ?? null);
+    if (event === "INITIAL_SESSION") {
+      activeUserId = session?.user?.id ?? null;
+      return;
+    }
+    const userId = session?.user?.id ?? null;
+    if (userId === activeUserId) return;
+    activeUserId = userId;
     setTimeout(() => {
-      loadVideos();
+      reloadVideos();
       if (session?.user) {
         obtenerCanalUsuario().then((userChannel) => { channel = userChannel; })
           .catch((error) => showToast(error.message || "No se pudo cargar tu canal."));
@@ -426,16 +530,20 @@ if (supabase) {
     }, 0);
   });
   supabase.auth.getSession().then(({ data, error }) => {
-    if (error) showToast(error.message);
+    if (error) {
+      showToast(error.message || "No se pudo restaurar la sesión.");
+      return;
+    }
     updateAuthUI(data.session?.user ?? null);
+    activeUserId = data.session?.user?.id ?? null;
     if (data.session?.user) {
       obtenerCanalUsuario().then((userChannel) => { channel = userChannel; })
         .catch((loadError) => showToast(loadError.message || "No se pudo cargar tu canal."));
     }
-  });
+  }).catch((error) => showToast(error.message || "No se pudo restaurar la sesión."));
 } else {
   $("#setup-notice").classList.remove("hidden");
   $("#setup-notice").textContent = "Agrega las variables de Supabase y Cloudinary indicadas en .env.example para activar las funciones.";
 }
 
-loadVideos();
+void loadVideos();

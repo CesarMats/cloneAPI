@@ -75,7 +75,13 @@ button { color: inherit; }
 .section-heading h2 span { color: var(--lime); font-size: 17px; }
 .result-count { padding-bottom: 3px; color: #76756f; font-size: 9px; letter-spacing: 1.1px; }
 .notice { margin: 0 0 17px; padding: 12px 15px; color: #d2e6a4; border: 1px solid #3e4a2d; border-radius: 6px; background: #20251a; font-size: 12px; }
+.notice.error { color: #ffb1a6; border-color: #58352f; background: #271b19; }
+.loading-state { display: flex; min-height: 135px; align-items: center; justify-content: center; gap: 11px; color: var(--muted); font-size: 12px; }
+.loading-spinner { width: 20px; height: 20px; border: 2px dotted var(--lime); border-radius: 50%; animation: spin 1.4s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .video-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 28px 20px; }
+.feed-actions { display: flex; justify-content: center; margin: 28px 0 0; }
+.feed-actions .button { min-width: 180px; }
 .video-card { min-width: 0; }
 .thumbnail { position: relative; display: grid; width: 100%; aspect-ratio: 16/9; place-items: center; overflow: hidden; padding: 0; border: 1px solid #353530; border-radius: 8px; background: linear-gradient(140deg,#262a20,#222320 55%,#33251e); cursor: pointer; }
 .thumbnail::before, .thumbnail::after { position: absolute; content: ""; }

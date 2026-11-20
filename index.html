@@ -64,7 +64,11 @@
               <span class="result-count" id="result-count"></span>
             </div>
             <div class="notice hidden" id="setup-notice"></div>
+            <div class="loading-state hidden" id="loading-state" role="status"><span class="loading-spinner"></span><span>Cargando videos…</span></div>
             <div class="video-grid" id="video-grid"></div>
+            <div class="feed-actions hidden" id="feed-actions">
+              <button class="button button-quiet" id="load-more" type="button">Cargar más videos</button>
+            </div>
             <div class="empty-state hidden" id="empty-state">
               <span class="empty-icon">◌</span><h3 id="empty-title">El siguiente video podría ser tuyo.</h3>
               <p id="empty-copy">Inicia sesión y comparte algo con la comunidad.</p>
@@ -130,6 +134,6 @@
       </dialog>
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
     </div>
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="./src/main.js"></script>
   </body>
 </html>
