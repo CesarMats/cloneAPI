@@ -10,13 +10,13 @@ Clon sencillo de una plataforma de videos: catálogo y búsqueda, registro e ini
 
 ## Instalación
 
-1. Instala las dependencias con `npm install`.
+1. Instala las dependencias con `npm install`. Si trabajas desde una memoria/disco que no permite enlaces simbólicos, usa `npm install --no-bin-links`.
 2. Copia `.env.example` a `.env` y completa:
    - `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`: URL y clave pública/anon de Supabase. No uses la `service_role`.
    - `VITE_CLOUDINARY_CLOUD_NAME` y `VITE_CLOUDINARY_UPLOAD_PRESET`: nombre de Cloudinary y unsigned preset.
 3. En Supabase, abre **SQL Editor**, ejecuta el contenido de `sql/schema.sql` y habilita Email en **Authentication → Providers**.
 4. En Cloudinary, configura el preset unsigned para aceptar únicamente videos, restringe los formatos permitidos y establece el límite de tamaño del lado de Cloudinary (100 MB). La validación del frontend no sustituye los límites del preset.
-5. Inicia la aplicación con `npm run dev`.
+5. Desde la carpeta del proyecto, inicia la aplicación con `npm run dev` y abre la dirección local que muestra Vite. No abras `index.html` con doble clic ni uses un servidor estático: Vite es quien carga `.env` y resuelve Supabase.
 
 ## Flujo de subida
 
